@@ -12,18 +12,32 @@ Our writeup should address the following questions:
 
 We can answer these questions with the following sections: 
 
-## Project Goal:
-### Introduction: 
-### Individual Learning Goals: 
+## Project Goal:      
+#### Introduction:  
+Give a brief introduction of our problem, 
 
-## Methodology Overview: 
+#### Individual Learning Goals:   
+Write two-three learning goals per person, explain how we divided work to meet those goals 
 
-## Design Decisions: 
+## Methodology Overview:   
+Explain methodology. Want to provide a lot of diagrams, gifs, videos etc here
+Basically go through the main loop and describe what happens to our particles as we drive around (initialization, updating, weighting, pose estimation, redistributing) 
+Overview the algorithms/equations. 
 
-## Challenges: 
+## Design Decisions:   
+Will fill out more of this after we complete the project. Likely, will be about how we initialize/weight/redistribute the particles. 
+Why gaussian? Do we reduce the number of particles over time? Satchel wanted to try out a different localization method as well, this 
+would be a good place for that. 
 
-## Potential Improvements: 
+## Challenges:   
+We are great. We had no challenges whatsoever with this project. 
 
-## Conclusion:
-### Lessons Learned: 
-### Contributions: 
+## Potential Improvements:   
+TBD. Maybe that other localization method? Maybe testing it out on the actual robot? 
+
+## Conclusion:  
+#### How It Went: 
+TBD. 
+
+#### Lessons Learned:   
+TBD. 
