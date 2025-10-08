@@ -251,6 +251,21 @@ class ParticleFilter(Node):
         # TODO: assign the latest pose into self.robot_pose as a geometry_msgs.Pose object
         # just to get started we will fix the robot's pose to always be at the origin
         self.robot_pose = Pose()
+        
+        x=0
+        y=0
+        theta = 0
+        for particle in self.particle_cloud:
+            x+= particle.x*particle.w
+            y+= particle.y*particle.w
+            theta += particle.theta*particle.w
+        x/= len(self.particle_cloud)**2
+        y/= len(self.particle_cloud)**2
+        theta/=len(self.particle_cloud)**2
+        #Should add some quadernon stuff here once we understand it more
+        self.robot_pose = Pose(position=Point(x=x, y=y, z=0.0), orientation = theta)
+        
+        
         if hasattr(self, 'odom_pose'):
             self.transform_helper.fix_map_to_odom_transform(self.robot_pose,
                                                             self.odom_pose)
@@ -331,6 +346,24 @@ class ParticleFilter(Node):
             theta: the angle relative to the robot frame for each corresponding reading 
         """
         # TODO: implement this
+        # Iterates through every particle in the particle cloud
+        for particle in self.particle_cloud:
+            # Initializes an error counter
+            error =0
+            # Couples the collection of laser scans into a list with r (lidar distance) and theta (angle), then begins iterating through them
+            for single_laser in enumerate(zip(r,theta)):
+                # Checks if the lidar distance r is finitie and therefore usable
+                if math.isfinite(single_laser(0)):
+                    # Translates angle of robot and laser into the map coordinate frame
+                    angle = single_laser(1)+self.current_odom_xy_theta(2)
+                    distance = single_laser(0)
+                    # Maps the laser's scan's x and y coordinates over the particles position to check for obstacles
+                    new_x = particle.x + distance*math.cos(angle)
+                    new_y = particle.y + distance*math.sin(angle)
+                    # Compares the particle's 'new' position to the nearest obstacle, with a higher error the further apart the two are
+                    error +=  self.occupancy_field.get_closest_obstacle_distance(new_x, new_y)
+            #Fitness function to evaluate weight based on this distance, closer to the obstacle each new particle was the higher the weigtht 
+            particle.w = 1/(min(1000, error/(len(self.particle_cloud))**2)**2)
         pass
 
 
