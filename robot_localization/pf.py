@@ -265,7 +265,6 @@ class ParticleFilter(Node):
         #Converts the theta angle measurement from 2D frame to 3 quadernion
         quaternion = quaternion_from_euler(0,0, theta)
 
-
         #Should add some quadernon stuff here once we understand it more
         self.robot_pose = Pose(position=Point(x=x, y=y, z=0.0), 
                                orientation = Quaternion(x=quaternion[0], y = quaternion[1], z = quaternion[2], w = quaternion[3]))
@@ -341,7 +340,22 @@ class ParticleFilter(Node):
         """
         # make sure the distribution is normalized
         self.normalize_particles()
+        # we normalize the particle weights again - im not sure why, they should be updated 
+
+        # so we can do this in a few ways. one way is we choose to keep or remove each particle 
+        # based on it's weight. For example, we could take the highest weight and set it to 1, 
+        # essentially deciding to keep it. We then scale every other weight based on the highest 
+        # weight, to a measure between zero and one, and then decide if we want to keep it. 
+
+        # the higher the weight, the more likely it will be to be chosen. 
+        # So anyway, we end up removing a number of particles and need to replace them 
+
+        # so we place a certain percentage of them (maybe 80%) in a gausian distribution around the
+        # new estimated pose. the other 20%, we place randomly around the map. this ensures we 
+        # will not be stuck in a local minimum 
+
         # TODO: fill out the rest of the function
+        
         
 
 
