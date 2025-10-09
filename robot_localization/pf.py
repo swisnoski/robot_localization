@@ -248,22 +248,27 @@ class ParticleFilter(Node):
         # first make sure that the particle weights are normalized
         self.normalize_particles()
 
-        # TODO: assign the latest pose into self.robot_pose as a geometry_msgs.Pose object
+        # TOFINISH: assign the latest pose into self.robot_pose as a geometry_msgs.Pose object
         # just to get started we will fix the robot's pose to always be at the origin
-        self.robot_pose = Pose()
         
+        #Initializes empty variables to hold the particles x, y and theta for the next robot guess
         x=0
         y=0
         theta = 0
+
+        #Goes through everything and weighs each particle relative position information
         for particle in self.particle_cloud:
             x+= particle.x*particle.w
             y+= particle.y*particle.w
             theta += particle.theta*particle.w
-        x/= len(self.particle_cloud)**2
-        y/= len(self.particle_cloud)**2
-        theta/=len(self.particle_cloud)**2
+
+        #Converts the theta angle measurement from 2D frame to 3 quadernion
+        quaternion = quaternion_from_euler(0,0, theta)
+
+
         #Should add some quadernon stuff here once we understand it more
-        self.robot_pose = Pose(position=Point(x=x, y=y, z=0.0), orientation = theta)
+        self.robot_pose = Pose(position=Point(x=x, y=y, z=0.0), 
+                               orientation = Quaternion(x=quaternion[0], y = quaternion[1], z = quaternion[2], w = quaternion[3]))
         
         
         if hasattr(self, 'odom_pose'):
@@ -345,7 +350,7 @@ class ParticleFilter(Node):
             r: the distance readings to obstacles
             theta: the angle relative to the robot frame for each corresponding reading 
         """
-        # TODO: implement this
+        # TOFINISH: implement this
         # Iterates through every particle in the particle cloud
         for particle in self.particle_cloud:
             # Initializes an error counter
