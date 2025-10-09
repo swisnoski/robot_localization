@@ -338,23 +338,43 @@ class ParticleFilter(Node):
             particle is selected in the resampling step.  You may want to make use of the given helper
             function draw_random_sample in helper_functions.py.
         """
+        self.normalize_particles()
+        
+        # TOFINISH: fill out the rest of the function
+
+        rng = np.random.default_rng()
+
+        weights = []
+        for particle in self.particle_cloud:
+            weights.append(particle.w)
+
+        sampled_particles = self.transform_helper.draw_random_sample(self.particle_cloud, weights, len(self.particle_cloud)*0.2)
+        sampled_weights = []
+        for particle in sampled_particles:
+            sampled_weights.append(particle.w)
+
+        num_kept_particles = len(self.particle_cloud)
+        # ADD NOISE TO SAMPLED PARTICLES 
+        self.particle_cloud = sampled_particles
+
+        for _ in range(num_kept_particles/4):
+            particle = self.transform_helper.draw_random_sample(sampled_particles, sampled_weights, 1)
+            center = (particle.x, particle.y)
+            gaussian_dist = rng.multivariate_normal(center, np.array([[2, -2], [-2, 2]]), size=12)
+            for x, y in gaussian_dist:
+                self.particle_cloud.append(Particle(x, y, 0, w=1/(num_kept_particles*5)))
+        
+        for _ in range(num_kept_particles):
+            #TODO make random particle 
+            x = 1
+            y = 1
+            heading = 1
+            self.particle_cloud.append(Particle(x=x, y=y, theta=heading, w=1/(num_kept_particles*5)))
+
         # make sure the distribution is normalized
         self.normalize_particles()
-        # we normalize the particle weights again - im not sure why, they should be updated 
-
-        # so we can do this in a few ways. one way is we choose to keep or remove each particle 
-        # based on it's weight. For example, we could take the highest weight and set it to 1, 
-        # essentially deciding to keep it. We then scale every other weight based on the highest 
-        # weight, to a measure between zero and one, and then decide if we want to keep it. 
-
-        # the higher the weight, the more likely it will be to be chosen. 
-        # So anyway, we end up removing a number of particles and need to replace them 
-
-        # so we place a certain percentage of them (maybe 80%) in a gausian distribution around the
-        # new estimated pose. the other 20%, we place randomly around the map. this ensures we 
-        # will not be stuck in a local minimum 
-
-        # TODO: fill out the rest of the function
+        
+        # TOFINISH: fill out the rest of the function
         
         
 
@@ -377,10 +397,15 @@ class ParticleFilter(Node):
                     angle = single_laser(1)+self.current_odom_xy_theta(2)
                     distance = single_laser(0)
                     # Maps the laser's scan's x and y coordinates over the particles position to check for obstacles
+                    # so basically, we take each finite robot scan value, which means there IS AN OBSTACLE THERE 
+                    # we graph this scan value onto the particles position using vector math 
                     new_x = particle.x + distance*math.cos(angle)
                     new_y = particle.y + distance*math.sin(angle)
                     # Compares the particle's 'new' position to the nearest obstacle, with a higher error the further apart the two are
                     error +=  self.occupancy_field.get_closest_obstacle_distance(new_x, new_y)
+                    # If the particle is on top of the robot, it will also see an object there, therefore the distance to object is zero
+                    # basically, it's just a robust way to compare scans 
+
             #Fitness function to evaluate weight based on this distance, closer to the obstacle each new particle was the higher the weigtht 
             particle.w = 1/(min(1000, error/(len(self.particle_cloud))**2)**2)
         pass
@@ -393,7 +418,7 @@ class ParticleFilter(Node):
         self.initialize_particle_cloud(msg.header.stamp, xy_theta)
         
 
-    def initialize_particle_cloud(self, timestamp, xy_theta=None, num_particles=500):
+    def initialize_particle_cloud(self, timestamp, xy_theta=None, num_particles=1000):
         """ Initialize the particle cloud.
             Arguments
             xy_theta: a triple consisting of the mean x, y, and theta (yaw) to initialize the
@@ -415,7 +440,7 @@ class ParticleFilter(Node):
 
         # Initialize particles around (x, y, theta)
         for x, y in gaussian_dist:
-            self.particle_cloud.append(Particle(x, y, xy_theta[2], w=1.0))
+            self.particle_cloud.append(Particle(x, y, xy_theta[2], w=1.0/num_particles))
                 
         self.normalize_particles()
         self.update_robot_pose()
