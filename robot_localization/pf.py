@@ -323,19 +323,13 @@ class ParticleFilter(Node):
         # as adding the deltas to each of the points in our particle cloud
 
         # we should also add some noise to these particles 
-        samples = np.zeros((self.n_particles, 3))
-        samples[:, :2] = np.random.normal(0, 0.1, (self.n_particles, 2))
-        samples[:, 2]  = np.random.normal(0, 0.02, self.n_particles)
 
-        for i, particle in enumerate(self.particle_cloud):
-            particle.x += delta[0] + samples[i, 0]
-            particle.y += delta[1] + samples[i, 1]
-            particle.theta += delta[2] + samples[i, 2]
-
-
-
-
-
+        for particle in self.particle_cloud:
+            particle.x += delta[0] 
+            particle.y += delta[1] 
+            particle.theta += delta[2]
+        
+        self.add_noise(self.particle_cloud)
 
 
 
@@ -356,31 +350,32 @@ class ParticleFilter(Node):
         for particle in self.particle_cloud:
             weights.append(particle.w)
 
-        sampled_particles = self.transform_helper.draw_random_sample(self.particle_cloud, weights, len(self.particle_cloud)*0.2)
+        sampled_particles = self.transform_helper.draw_random_sample(self.particle_cloud, weights, int(len(self.particle_cloud)*0.2))
+        self.add_noise(sampled_particles)
+
         sampled_weights = []
         for particle in sampled_particles:
             sampled_weights.append(particle.w)
 
         num_kept_particles = len(self.particle_cloud)
-        # ADD NOISE TO SAMPLED PARTICLES 
+
         self.particle_cloud = sampled_particles
 
-        for _ in range(num_kept_particles/4):
+        for _ in range(num_kept_particles//4):
             particle = self.transform_helper.draw_random_sample(sampled_particles, sampled_weights, 1)
             center = (particle.x, particle.y)
-            gaussian_dist = rng.multivariate_normal(center, np.array([[2, -2], [-2, 2]]), size=12)
+            gaussian_dist = rng.multivariate_normal(center, np.array([[1.0, 0.0], [0.0, 1.0]]), size=12)
             for x, y in gaussian_dist:
                 self.particle_cloud.append(Particle(x, y, 0, w=1/(num_kept_particles*5)))
         
         for _ in range(num_kept_particles):
             #TODO make random particle 
-            x = 1
-            y = 1
-            heading = 1
-            self.particle_cloud.append(Particle(x=x, y=y, theta=heading, w=1/(num_kept_particles*5)))
+            self.particle_cloud.append(self.random_particle())
 
         # make sure the distribution is normalized
+
         self.normalize_particles()
+        self.add_noise(sampled_particles)
         
         # TOFINISH: fill out the rest of the function
         
@@ -394,21 +389,23 @@ class ParticleFilter(Node):
         """
         # TOFINISH: implement this
         # Iterates through every particle in the particle cloud
+        self.normalize_particles()
         for particle in self.particle_cloud:
             # Initializes an error counter
             error =0
             # Couples the collection of laser scans into a list with r (lidar distance) and theta (angle), then begins iterating through them
-            for single_laser in enumerate(zip(r,theta)):
+            for i, (r_val, theta_val) in enumerate(zip(r, theta)):
                 # Checks if the lidar distance r is finitie and therefore usable
-                if math.isfinite(single_laser(0)):
+                if math.isfinite(r_val):
                     # Translates angle of robot and laser into the map coordinate frame
-                    angle = single_laser(1)+self.current_odom_xy_theta(2)
-                    distance = single_laser(0)
+                    angle = theta_val + self.current_odom_xy_theta[2]
+                    distance = r_val
                     # Maps the laser's scan's x and y coordinates over the particles position to check for obstacles
                     # so basically, we take each finite robot scan value, which means there IS AN OBSTACLE THERE 
                     # we graph this scan value onto the particles position using vector math 
                     new_x = particle.x + distance*math.cos(angle)
                     new_y = particle.y + distance*math.sin(angle)
+
                     # Compares the particle's 'new' position to the nearest obstacle, with a higher error the further apart the two are
                     error +=  self.occupancy_field.get_closest_obstacle_distance(new_x, new_y)
                     # If the particle is on top of the robot, it will also see an object there, therefore the distance to object is zero
@@ -425,6 +422,7 @@ class ParticleFilter(Node):
         xy_theta = self.transform_helper.convert_pose_to_xy_and_theta(msg.pose.pose)
         self.initialize_particle_cloud(msg.header.stamp, xy_theta)
         
+
 
     def initialize_particle_cloud(self, timestamp, xy_theta=None, num_particles=1000):
         """ Initialize the particle cloud.
@@ -472,7 +470,6 @@ class ParticleFilter(Node):
         #TOFINISH
 
 
-
     def publish_particles(self, timestamp):
         msg = ParticleCloud()
         msg.header.frame_id = self.map_frame
@@ -489,6 +486,30 @@ class ParticleFilter(Node):
         if self.scan_to_process is None:
             self.scan_to_process = msg
 
+
+    def add_noise(self, particle_list):
+        samples = np.zeros((len(particle_list), 3))
+        samples[:, :2] = np.random.normal(0, 0.1, (len(particle_list), 2))
+        samples[:, 2]  = np.random.normal(0, 0.02, len(particle_list))
+
+        for i, particle in enumerate(particle_list):
+            particle.x += samples[i, 0]
+            particle.y += samples[i, 1]
+            particle.theta += samples[i, 2]
+
+    def random_particle(self):
+        (x_bounds, y_bounds) = self.occupancy_field.get_obstacle_bounding_box()
+        lower_x, upper_x = x_bounds
+        lower_y, upper_y = y_bounds
+
+        while True:
+            x = np.random.uniform(lower_x, upper_x)
+            y = np.random.uniform(lower_y, upper_y)
+            theta = np.random.uniform(0, 2 * np.pi)
+
+            distance = self.occupancy_field.get_closest_obstacle_distance(x, y)
+            if np.isfinite(distance):
+                return Particle(x, y, theta)
 
 def main(args=None):
     rclpy.init()
