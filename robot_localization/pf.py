@@ -322,11 +322,19 @@ class ParticleFilter(Node):
         # luckily, each of our particles are already calculated in the global frame, so it's as simple 
         # as adding the deltas to each of the points in our particle cloud
 
-        for particle in self.particle_cloud:
-            # particle is [x,y,theta], so is delta
-            particle.x += delta[0]
-            particle.y += delta[1]
-            particle.theta += delta[2]
+        # we should also add some noise to these particles 
+        samples = np.zeros((self.n_particles, 3))
+        samples[:, :2] = np.random.normal(0, 0.1, (self.n_particles, 2))
+        samples[:, 2]  = np.random.normal(0, 0.02, self.n_particles)
+
+        for i, particle in enumerate(self.particle_cloud):
+            particle.x += delta[0] + samples[i, 0]
+            particle.y += delta[1] + samples[i, 1]
+            particle.theta += delta[2] + samples[i, 2]
+
+
+
+
 
 
 
