@@ -16,7 +16,7 @@ import math
 import time
 import numpy as np
 from occupancy_field import OccupancyField
-from helper_functions import TFHelper
+from helper_functions import TFHelper, draw_random_sample
 from rclpy.qos import qos_profile_sensor_data
 from angle_helpers import quaternion_from_euler
 
@@ -297,7 +297,7 @@ class ParticleFilter(Node):
         new_odom_xy_theta = self.transform_helper.convert_pose_to_xy_and_theta(self.odom_pose)
         old_odom_xy_theta = self.current_odom_xy_theta
 
-
+        delta = (0,0,0)
         # compute the change in x,y,theta since our last update
 
         if self.current_odom_xy_theta:
@@ -334,50 +334,68 @@ class ParticleFilter(Node):
 
 
 
+    # def resample_particles(self):
+    #     """Resample particles according to their weights and maintain constant population."""
+    #     self.normalize_particles()
+
+    #     n_total = self.n_particles                # desired total particle count
+    #     n_from_existing = int(n_total * 0.3)      # keep 30% from current distribution
+    #     n_random = n_total - n_from_existing      # introduce some new randoms for diversity
+
+    #     # Extract weights
+    #     weights = [p.w for p in self.particle_cloud]
+
+    #     # Draw resampled particles (weighted by existing probabilities)
+    #     resampled = draw_random_sample(self.particle_cloud, weights, n_from_existing)
+
+    #     # Optionally jitter around high-weight particles to maintain spread
+    #     rng = np.random.default_rng()
+    #     noisy_particles = []
+    #     for p in resampled:
+    #         x, y = p.x, p.y
+    #         x += rng.normal(0, 0.05)  # 5 cm noise
+    #         y += rng.normal(0, 0.05)
+    #         noisy_particles.append(Particle(x, y, p.theta, w=p.w))
+
+    #     # Add a small fraction of totally random new particles
+    #     random_particles = [self.random_particle() for _ in range(n_random)]
+
+    #     # Combine them
+    #     self.particle_cloud = noisy_particles + random_particles
+
+    #     # Re-normalize
+    #     self.normalize_particles()
+
     def resample_particles(self):
-        """ Resample the particles according to the new particle weights.
-            The weights stored with each particle should define the probability that a particular
-            particle is selected in the resampling step.  You may want to make use of the given helper
-            function draw_random_sample in helper_functions.py.
-        """
         self.normalize_particles()
-        
-        # TOFINISH: fill out the rest of the function
+
+        n_total = self.n_particles
+        n_keep = int(0.3 * n_total)
+        n_gaussian = int(0.5 * n_total)
+        n_random = n_total - n_keep - n_gaussian
 
         rng = np.random.default_rng()
 
-        weights = []
-        for particle in self.particle_cloud:
-            weights.append(particle.w)
+        weights = [p.w for p in self.particle_cloud]
 
-        sampled_particles = self.transform_helper.draw_random_sample(self.particle_cloud, weights, int(len(self.particle_cloud)*0.2))
-        self.add_noise(sampled_particles)
+        kept_particles = draw_random_sample(self.particle_cloud, weights, n_keep)
 
-        sampled_weights = []
-        for particle in sampled_particles:
-            sampled_weights.append(particle.w)
+        gaussian_particles = []
+        for _ in range(n_gaussian):
+            parent = rng.choice(kept_particles)
+            x, y = rng.multivariate_normal([parent.x, parent.y], [[1.0, 0.0], [0.0, 1.0]])
+            theta = parent.theta
+            gaussian_particles.append(Particle(x, y, theta, w=1.0))
 
-        num_kept_particles = len(self.particle_cloud)
+        random_particles = [self.random_particle() for _ in range(n_random)]
 
-        self.particle_cloud = sampled_particles
+        self.particle_cloud = kept_particles + gaussian_particles + random_particles
 
-        for _ in range(num_kept_particles//4):
-            particle = self.transform_helper.draw_random_sample(sampled_particles, sampled_weights, 1)
-            center = (particle.x, particle.y)
-            gaussian_dist = rng.multivariate_normal(center, np.array([[1.0, 0.0], [0.0, 1.0]]), size=12)
-            for x, y in gaussian_dist:
-                self.particle_cloud.append(Particle(x, y, 0, w=1/(num_kept_particles*5)))
-        
-        for _ in range(num_kept_particles):
-            #TODO make random particle 
-            self.particle_cloud.append(self.random_particle())
-
-        # make sure the distribution is normalized
-
+        self.add_noise(self.particle_cloud)
         self.normalize_particles()
-        self.add_noise(sampled_particles)
-        
-        # TOFINISH: fill out the rest of the function
+
+
+
         
         
 
@@ -413,7 +431,6 @@ class ParticleFilter(Node):
 
             #Fitness function to evaluate weight based on this distance, closer to the obstacle each new particle was the higher the weigtht 
             particle.w = 1/(min(1000, error/(len(self.particle_cloud))**2)**2)
-        pass
 
 
     def update_initial_pose(self, msg):
@@ -424,7 +441,7 @@ class ParticleFilter(Node):
         
 
 
-    def initialize_particle_cloud(self, timestamp, xy_theta=None, num_particles=1000):
+    def initialize_particle_cloud(self, timestamp, xy_theta=None):
         """ Initialize the particle cloud.
             Arguments
             xy_theta: a triple consisting of the mean x, y, and theta (yaw) to initialize the
@@ -439,14 +456,15 @@ class ParticleFilter(Node):
         # each particle takes in an x, y, theta, and weight 
         # when we initalize, we just want to set x, y, and theta, weight will just be 1 
         center = (xy_theta[0], xy_theta[1])
-        cov = np.array([[10, -10], [-10, 10]])
+        cov = np.array([[3.0, 0.0],
+                [0.0, 3.0]])
         rng = np.random.default_rng()
 
-        gaussian_dist = rng.multivariate_normal(center, cov, size=num_particles)
+        gaussian_dist = rng.multivariate_normal(center, cov, size=self.n_particles)
 
         # Initialize particles around (x, y, theta)
         for x, y in gaussian_dist:
-            self.particle_cloud.append(Particle(x, y, xy_theta[2], w=1.0/num_particles))
+            self.particle_cloud.append(Particle(x, y, np.random.uniform(0, 2 * np.pi), w=1.0/self.n_particles))
                 
         self.normalize_particles()
         self.update_robot_pose()
