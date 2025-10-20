@@ -78,7 +78,7 @@ class ParticleFilter(Node):
         self.odom_frame = "odom"        # the name of the odometry coordinate frame
         self.scan_topic = "scan"        # the topic where we will get laser scans from 
 
-        self.n_particles = 300          # the number of particles to use
+        self.n_particles = 500          # the number of particles to use
 
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
         self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
@@ -258,9 +258,9 @@ class ParticleFilter(Node):
 
         #Goes through everything and weighs each particle relative position information
         for particle in self.particle_cloud:
-            x+= particle.x*particle.w
-            y+= particle.y*particle.w
-            theta += particle.theta*particle.w
+            x+= particle.x*(particle.w)
+            y+= particle.y*(particle.w)
+            theta += particle.theta*(particle.w)
 
         #Converts the theta angle measurement from 2D frame to 3 quadernion
         quaternion = quaternion_from_euler(0,0, theta)
@@ -275,6 +275,7 @@ class ParticleFilter(Node):
                                                             self.odom_pose)
         else:
             self.get_logger().warn("Can't set map->odom transform since no odom data received")
+        
 
 
 
@@ -333,45 +334,13 @@ class ParticleFilter(Node):
 
 
 
-
-    # def resample_particles(self):
-    #     """Resample particles according to their weights and maintain constant population."""
-    #     self.normalize_particles()
-
-    #     n_total = self.n_particles                # desired total particle count
-    #     n_from_existing = int(n_total * 0.3)      # keep 30% from current distribution
-    #     n_random = n_total - n_from_existing      # introduce some new randoms for diversity
-
-    #     # Extract weights
-    #     weights = [p.w for p in self.particle_cloud]
-
-    #     # Draw resampled particles (weighted by existing probabilities)
-    #     resampled = draw_random_sample(self.particle_cloud, weights, n_from_existing)
-
-    #     # Optionally jitter around high-weight particles to maintain spread
-    #     rng = np.random.default_rng()
-    #     noisy_particles = []
-    #     for p in resampled:
-    #         x, y = p.x, p.y
-    #         x += rng.normal(0, 0.05)  # 5 cm noise
-    #         y += rng.normal(0, 0.05)
-    #         noisy_particles.append(Particle(x, y, p.theta, w=p.w))
-
-    #     # Add a small fraction of totally random new particles
-    #     random_particles = [self.random_particle() for _ in range(n_random)]
-
-    #     # Combine them
-    #     self.particle_cloud = noisy_particles + random_particles
-
-    #     # Re-normalize
-    #     self.normalize_particles()
-
     def resample_particles(self):
+
         self.normalize_particles()
 
         n_total = self.n_particles
-        n_keep = int(0.3 * n_total)
-        n_gaussian = int(0.5 * n_total)
+        n_keep = int(0.4 * n_total)
+        n_gaussian = int(0.0 * n_total)
         n_random = n_total - n_keep - n_gaussian
 
         rng = np.random.default_rng()
@@ -416,7 +385,7 @@ class ParticleFilter(Node):
                 # Checks if the lidar distance r is finitie and therefore usable
                 if math.isfinite(r_val):
                     # Translates angle of robot and laser into the map coordinate frame
-                    angle = theta_val + self.current_odom_xy_theta[2]
+                    angle = theta_val + particle.theta
                     distance = r_val
                     # Maps the laser's scan's x and y coordinates over the particles position to check for obstacles
                     # so basically, we take each finite robot scan value, which means there IS AN OBSTACLE THERE 
@@ -430,7 +399,7 @@ class ParticleFilter(Node):
                     # basically, it's just a robust way to compare scans 
 
             #Fitness function to evaluate weight based on this distance, closer to the obstacle each new particle was the higher the weigtht 
-            particle.w = 1/(min(1000, error/(len(self.particle_cloud))**2)**2)
+            particle.w = 1/(min(1000, error/self.n_particles**2)**2)
 
 
     def update_initial_pose(self, msg):
@@ -508,7 +477,7 @@ class ParticleFilter(Node):
     def add_noise(self, particle_list):
         samples = np.zeros((len(particle_list), 3))
         samples[:, :2] = np.random.normal(0, 0.1, (len(particle_list), 2))
-        samples[:, 2]  = np.random.normal(0, 0.02, len(particle_list))
+        samples[:, 2]  = np.random.normal(0, 0.1, len(particle_list))
 
         for i, particle in enumerate(particle_list):
             particle.x += samples[i, 0]
