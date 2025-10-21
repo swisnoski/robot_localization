@@ -33,6 +33,17 @@ Explain methodology. Want to provide a lot of diagrams, gifs, videos etc here
 Basically go through the main loop and describe what happens to our particles as we drive around (initialization, updating, weighting, pose estimation, redistributing) 
 Overview the algorithms/equations. 
 
+Main loop: 
+![Loop of our robot localization functionality](media/localization_diagram.jpg)
+
+Step 1: 
+Step 2: 
+Step 3: 
+Step 4
+Step 5: 
+
+Insert gif of working thing/
+
 ## Design Decisions:   
 Will fill out more of this after we complete the project. Likely, will be about how we initialize/weight/redistribute the particles. 
 Why gaussian? Do we reduce the number of particles over time? Satchel wanted to try out a different localization method as well, this 
