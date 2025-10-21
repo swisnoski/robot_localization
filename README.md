@@ -36,13 +36,23 @@ Overview the algorithms/equations.
 Main loop: 
 ![Loop of our robot localization functionality](media/localization_diagram.jpg)
 
-Step 1: 
-Step 2: 
-Step 3: 
-Step 4
-Step 5: 
+#### Step 1:   
 
-Insert gif of working thing/
+
+#### Step 2: 
+
+
+#### Step 3: 
+
+
+#### Step 4: 
+
+
+#### Step 5: 
+
+
+### Final Result:   
+![Gif of our particle filter converging](media/convergence_path_1.gif)
 
 ## Design Decisions:   
 Will fill out more of this after we complete the project. Likely, will be about how we initialize/weight/redistribute the particles. 
