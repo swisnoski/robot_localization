@@ -260,7 +260,9 @@ class ParticleFilter(Node):
         for particle in self.particle_cloud:
             x+= particle.x*(particle.w)
             y+= particle.y*(particle.w)
-            theta += particle.theta*(particle.w)
+            sin_sum = sum(math.sin(p.theta) * p.w for p in self.particle_cloud)
+            cos_sum = sum(math.cos(p.theta) * p.w for p in self.particle_cloud)
+            theta = math.atan2(sin_sum, cos_sum)
 
         #Converts the theta angle measurement from 2D frame to 3 quadernion
         quaternion = quaternion_from_euler(0,0, theta)
@@ -323,7 +325,7 @@ class ParticleFilter(Node):
         # luckily, each of our particles are already calculated in the global frame, so it's as simple 
         # as adding the deltas to each of the points in our particle cloud
 
-        # we should also add some noise to these particles 
+        # we should also add some noise to these particles 255
 
         for particle in self.particle_cloud:
             particle.x += delta[0] 
@@ -339,8 +341,8 @@ class ParticleFilter(Node):
         self.normalize_particles()
 
         n_total = self.n_particles
-        n_keep = int(0.4 * n_total)
-        n_gaussian = int(0.0 * n_total)
+        n_keep = int(0.6 * n_total)
+        n_gaussian = int(0.1 * n_total)
         n_random = n_total - n_keep - n_gaussian
 
         rng = np.random.default_rng()
@@ -352,7 +354,7 @@ class ParticleFilter(Node):
         gaussian_particles = []
         for _ in range(n_gaussian):
             parent = rng.choice(kept_particles)
-            x, y = rng.multivariate_normal([parent.x, parent.y], [[1.0, 0.0], [0.0, 1.0]])
+            x, y = rng.multivariate_normal([parent.x, parent.y], [[0.5, 0.0], [0.0, 0.5]])
             theta = parent.theta
             gaussian_particles.append(Particle(x, y, theta, w=1.0))
 
@@ -377,29 +379,28 @@ class ParticleFilter(Node):
         # TOFINISH: implement this
         # Iterates through every particle in the particle cloud
         self.normalize_particles()
+        sigma = 0.5  # Tune this: typical lidar matching noise in meters
         for particle in self.particle_cloud:
-            # Initializes an error counter
-            error =0
-            # Couples the collection of laser scans into a list with r (lidar distance) and theta (angle), then begins iterating through them
-            for i, (r_val, theta_val) in enumerate(zip(r, theta)):
-                # Checks if the lidar distance r is finitie and therefore usable
+            error_sum = 0.0
+            count = 0
+
+            for r_val, theta_val in zip(r, theta):
                 if math.isfinite(r_val):
-                    # Translates angle of robot and laser into the map coordinate frame
-                    angle = theta_val + particle.theta
-                    distance = r_val
-                    # Maps the laser's scan's x and y coordinates over the particles position to check for obstacles
-                    # so basically, we take each finite robot scan value, which means there IS AN OBSTACLE THERE 
-                    # we graph this scan value onto the particles position using vector math 
-                    new_x = particle.x + distance*math.cos(angle)
-                    new_y = particle.y + distance*math.sin(angle)
+                    angle = particle.theta + theta_val
+                    new_x = particle.x + r_val * math.cos(angle)
+                    new_y = particle.y + r_val * math.sin(angle)
 
-                    # Compares the particle's 'new' position to the nearest obstacle, with a higher error the further apart the two are
-                    error +=  self.occupancy_field.get_closest_obstacle_distance(new_x, new_y)
-                    # If the particle is on top of the robot, it will also see an object there, therefore the distance to object is zero
-                    # basically, it's just a robust way to compare scans 
+                    dist = self.occupancy_field.get_closest_obstacle_distance(new_x, new_y)
+                    if np.isfinite(dist):
+                        error_sum += dist**2
+                        count += 1
 
-            #Fitness function to evaluate weight based on this distance, closer to the obstacle each new particle was the higher the weigtht 
-            particle.w = 1/(min(1000, error/self.n_particles**2)**2)
+            if count > 0:
+                # Gaussian likelihood — high when mean_error small
+                particle.w = (math.exp(- (error_sum / count) / (2 * sigma**2)))**2
+            else:
+                particle.w = 1e-6  # fallback for weird scans
+
 
 
     def update_initial_pose(self, msg):
@@ -476,8 +477,8 @@ class ParticleFilter(Node):
 
     def add_noise(self, particle_list):
         samples = np.zeros((len(particle_list), 3))
-        samples[:, :2] = np.random.normal(0, 0.1, (len(particle_list), 2))
-        samples[:, 2]  = np.random.normal(0, 0.1, len(particle_list))
+        samples[:, :2] = np.random.normal(0, 0.05, (len(particle_list), 2))
+        samples[:, 2]  = np.random.normal(0, 0.05, len(particle_list))
 
         for i, particle in enumerate(particle_list):
             particle.x += samples[i, 0]
