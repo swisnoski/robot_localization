@@ -59,11 +59,15 @@ Will fill out more of this after we complete the project. Likely, will be about 
 Why gaussian? Do we reduce the number of particles over time? Satchel wanted to try out a different localization method as well, this 
 would be a good place for that. 
 
+One of our design decisions was in our resampling function. We split all new particles into three distinct groups - first 60% are 'kept' particles, or randomly chosen from the previously iteration of particles, with higher weighted particles being more likely to be chosen. We chose to implement this instead of simply keeping the 60% highest weighted particles to ensure some randomness in the localization - keeping the exact same 60% would be susceptiple to local minimums, where a particle could fall into a pose far closer to being correct than any of the surrounding poses, and would remain there throughout multiple iterations. To aid this, another 30% of resampled particles are completely random - this was done to help particles escape the local minumum, but also speed up exploration of far-off map areas. The final 10% were found from a Gaussian distribution of the kept particles, which conceptually works as a middle ground between the other two groups. We begin by determing a subsection of our kept particles, then randomly picking a point inside a radius centered around each kept particle. This helps the particle explore multiple close guesses, espieically prevneting it from getting trapped in areas with lots of local minimums, which will naturally increase as it converges closer and closer to the actual map space.
+
 ## Challenges:   
 We are great. We had no challenges whatsoever with this project. 
 
 ## Potential Improvements:   
 TBD. Maybe that other localization method? Maybe testing it out on the actual robot? 
+
+As a stretch goal for this project, we wanted to implement the Kalman filter and test the difference between the two. Would one converge faster, would it be more prone to errors? In the end, we found implementing a homemade Kalman filter to be too tricky but would love to try again if given more time for the project. We would also want to improve convergence as the robot is turning, as we have the found the most errors with this, although this is likley due to a lack of data points.
 
 ## Conclusion:  
 #### How It Went: 
