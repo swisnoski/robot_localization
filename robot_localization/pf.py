@@ -339,29 +339,35 @@ class ParticleFilter(Node):
     def resample_particles(self):
 
         self.normalize_particles()
-
+        #Find the total number of particles
         n_total = self.n_particles
+        #Split particles into different groups for resampling - here 60% is kept, 10% is for gaussian distribution, 30% is random
         n_keep = int(0.6 * n_total)
         n_gaussian = int(0.1 * n_total)
         n_random = n_total - n_keep - n_gaussian
-
+        #Creates a random number generator for use in the Gaussian
         rng = np.random.default_rng()
-
+        #Creates an empty list fo particle weights
         weights = [p.w for p in self.particle_cloud]
-
+        #Filters our n_keep as 60% of total particles as kept, being more likley to select particles with a higher weight
         kept_particles = draw_random_sample(self.particle_cloud, weights, n_keep)
-
+        #Creates an empty list for gaussian particles than iterates through a loop n_guassian amount of times (30)
         gaussian_particles = []
         for _ in range(n_gaussian):
+            #Picks one 'parent' particle randomly from the kept particles list, with higher weighted particles being more likely to be picked
             parent = rng.choice(kept_particles)
+            #Randomly picks a new particle pose from a small radius around each particle
             x, y = rng.multivariate_normal([parent.x, parent.y], [[0.5, 0.0], [0.0, 0.5]])
-            theta = parent.theta
+            #Adds a bit of randomness to the new theta as well
+            theta = parent.theta + rng.normal(-0.05, 0.05)
+            #Add the particle we just generated to the gaussian list, setting it's weight to 1 - this doesn't really matter as it'll be immediatley updated in our loop
             gaussian_particles.append(Particle(x, y, theta, w=1.0))
 
+        #Populates a list with the random poses
         random_particles = [self.random_particle() for _ in range(n_random)]
-
+        #Combines all of the lists into a new particle cloud
         self.particle_cloud = kept_particles + gaussian_particles + random_particles
-
+        #Adds some stochasitic randomness to every particle and normalizes all particles
         self.add_noise(self.particle_cloud)
         self.normalize_particles()
 
