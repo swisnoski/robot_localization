@@ -44,10 +44,10 @@ Main loop:
 
 
 #### Step 3: 
-
+Our weighting function is made from mapping the closest laser scans onto each particle, and then comparing that to the map to check for accuracy. We do this by evaluating an error by looping through every one of our new particles in the particle and every one of our finite lidar scan. We then map the beam's endpoints to each particle and compare that to world map's obstacles. By returning that distance, we punish inaccurate scans. We actually square this distance as a design choice to even further filter out far off points. Finally, sum all of the errors of each laser scan to a net error per particle, then use a Gaussian probabibility model to transform the error into a weight for the particle, with higher weights corresponding to more likley poses in the particle cloud.
 
 #### Step 4: 
-
+Step 4 involves calculating a new, summarized pose from the particle cloud's data. We begin by iterating through every particle in the cloud and summing the x and y position multiplied by the particle's weight to create an entire new x and y point. To find the new theta, we cannot simply sum the angles, but we can sum the sins and cosines first by splitting every particle's theta into the two values, then multiplying by the weights again, then recombining for theta. One last little change is we must transform the angle into quaternion, so the Pose() function can read it. Finally we use transform_helper to verify it's a real pose.
 
 #### Step 5: 
 
